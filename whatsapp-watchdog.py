@@ -5,11 +5,13 @@ import time
 
 # ---------- CONFIG ----------
 SHEET_NAME = "Coolify-Wudgres"
-JSON_FILE = "app/credentials.json"
+# CHANGE: Removed 'app/' because the script is already IN the /app directory
+JSON_FILE = "credentials.json"
 
 API_URL = "http://evo-v40s8cc8o8gw0kgswos4w0wc.72.62.197.26.sslip.io"
 API_KEY = "QM6HxQI2oBX3gkwLu6qn8RSBFtWXvlMv"
 INSTANCE = "wudgres"
+# ... rest of your config
 
 OWNER_PHONE = "918660694556"
 
@@ -113,7 +115,7 @@ def run_automation():
                     f"Your nearest Wudgres Display Center is:\n"
                     f"       *{d_name}*\n"
                     f"📞 {d_phone}\n\n"
-                    f"📌 Location Map:\n" # Move link to a new line for better recognition
+                    f"📌 Location Map:\n"  # Move link to a new line for better recognition
                     f"{d_addr}\n\n"
                     f"They’ll help you explore designs, finishes, and pricing in detail.\n"
                     f"Feel free to reach out or walk in at your convenience.\n\n"
