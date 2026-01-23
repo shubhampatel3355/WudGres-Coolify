@@ -26,19 +26,32 @@ def setup_google_sheets():
         "https://www.googleapis.com/auth/drive",
     ]
 
-    # Read base64 credentials from Environment Variable
-    b64_creds = os.getenv("GOOGLE_CREDENTIALS_BASE64")
-    if not b64_creds:
-        raise RuntimeError("❌ GOOGLE_CREDENTIALS_BASE64 Environment Variable not set")
+    # 1. Get the env variable and strip any accidental whitespace/quotes
+    raw_b64 = os.getenv("GOOGLE_CREDENTIALS_BASE64", "").strip().strip('"').strip("'")
+    
+    if not raw_b64:
+        raise RuntimeError("❌ GOOGLE_CREDENTIALS_BASE64 is empty or not set in Coolify.")
 
     try:
-        creds_json = base64.b64decode(b64_creds).decode("utf-8")
+        # 2. Decode and parse
+        creds_json = base64.b64decode(raw_b64).decode("utf-8")
         creds_dict = json.loads(creds_json)
+        
+        # 3. Initialize credentials
         creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
         client = gspread.authorize(creds)
-        return client.open(SHEET_NAME).sheet1
+        
+        # 4. Attempt to open the sheet immediately to test the connection
+        opened_sheet = client.open(SHEET_NAME).sheet1
+        return opened_sheet
+        
+    except base64.binascii.Error:
+        raise RuntimeError("❌ Base64 decoding failed. The string in Coolify might be truncated.")
+    except json.JSONDecodeError:
+        raise RuntimeError("❌ JSON parsing failed. The decoded string is not valid JSON.")
     except Exception as e:
-        raise RuntimeError(f"❌ Failed to initialize Google Sheets: {e}")
+        # This will catch the 'invalid_grant' and give more context
+        raise RuntimeError(f"❌ Google Auth Error: {e}")
 
 def format_phone(phone):
     """Cleans and ensures 91 prefix for Indian numbers."""
