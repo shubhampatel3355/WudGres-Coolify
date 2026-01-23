@@ -5,7 +5,7 @@ import time
 
 # ---------- CONFIG ----------
 SHEET_NAME = "Coolify-Wudgres"
-JSON_FILE = "credentials.json"
+JSON_FILE = "app/credentials.json"
 
 API_URL = "http://evo-v40s8cc8o8gw0kgswos4w0wc.72.62.197.26.sslip.io"
 API_KEY = "QM6HxQI2oBX3gkwLu6qn8RSBFtWXvlMv"
