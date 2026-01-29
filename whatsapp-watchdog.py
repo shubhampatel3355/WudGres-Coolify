@@ -2,13 +2,11 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import requests
 import time
-
 import os
+import json
 
 # ---------- CONFIG ----------
 SHEET_NAME = "Coolify-Wudgres"
-script_dir = os.path.dirname(os.path.abspath(__file__))
-JSON_FILE = os.path.join(script_dir, "credentials.json")
 
 API_URL = "http://evo-v40s8cc8o8gw0kgswos4w0wc.72.62.197.26.sslip.io"
 API_KEY = "QM6HxQI2oBX3gkwLu6qn8RSBFtWXvlMv"
@@ -29,13 +27,20 @@ def setup_google_sheets():
         "https://spreadsheets.google.com/feeds",
         "https://www.googleapis.com/auth/drive",
     ]
-    creds = ServiceAccountCredentials.from_json_keyfile_name(JSON_FILE, scope)
+
+    # 🔐 Load credentials from environment variable (Coolify)
+    creds_json = os.environ.get("GOOGLE_CREDENTIALS_JSON")
+    if not creds_json:
+        raise Exception("GOOGLE_CREDENTIALS_JSON env variable not found")
+
+    creds_dict = json.loads(creds_json)
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+
     client = gspread.authorize(creds)
     return client.open(SHEET_NAME).sheet1
 
 
 def format_phone(phone):
-    """Cleans and ensures 91 prefix for Indian numbers."""
     if not phone:
         return None
     clean = str(phone).replace("+", "").replace(" ", "").replace("-", "").strip()
@@ -87,7 +92,7 @@ def run_automation():
         return
 
     last_wait_log_time = time.time()
-    print(f"🚀 Wudgres System Live. Links will be active if they start with https://")
+    print("🚀 Wudgres System Live. Links will be active if they start with https://")
 
     while True:
         processed_any = False
@@ -100,26 +105,22 @@ def run_automation():
 
                 processed_any = True
 
-                # Mapping
                 c_name = row.get("CustomerName", "Customer")
                 c_phone = row.get("CustomerPhone")
                 c_pin = row.get("CustomerPincode", "N/A")
                 d_name = row.get("DealerName", "Assigned Dealer")
                 d_phone = row.get("DealerPhone")
-                d_addr = row.get("DealerAddress", "").strip()  # This should be a URL
-
-                # --- 1. Customer Message (With Clickable Link) ---
+                d_addr = row.get("DealerAddress", "").strip()
 
                 customer_msg = (
                     f"Hi {c_name},\n"
                     f"Thanks for your interest in Wudgres.\n\n"
                     f"Your nearest Wudgres Display Center is:\n"
-                    f"       *{d_name}*\n"
+                    f"*{d_name}*\n"
                     f"📞 {d_phone}\n\n"
-                    f"📌 Location Map:\n"  # Move link to a new line for better recognition
+                    f"📌 Location Map:\n"
                     f"{d_addr}\n\n"
-                    f"They’ll help you explore designs, finishes, and pricing in detail.\n"
-                    f"Feel free to reach out or walk in at your convenience.\n\n"
+                    f"They’ll help you explore designs, finishes, and pricing in detail.\n\n"
                     f"Warm regards,\n"
                     f"Team Wudgres"
                 )
@@ -127,21 +128,18 @@ def run_automation():
                 customer_status = send_whatsapp(c_phone, customer_msg, "Customer")
                 time.sleep(2)
 
-                # --- 2. Dealer Notification ---
                 dealer_msg = (
                     f"New Wudgres enquiry assigned to you.\n\n"
                     f"Customer details:\n"
                     f"Name: {c_name}\n"
                     f"Phone: {c_phone}\n"
                     f"Pincode: {c_pin}\n\n"
-                    f"The customer has been informed about your display center.\n"
                     f"Please connect with them at the earliest.\n\n"
                     f"– Wudgres"
                 )
                 dealer_status = send_whatsapp(d_phone, dealer_msg, "Dealer")
                 time.sleep(2)
 
-                # --- 3. Owner Visibility ---
                 owner_msg = (
                     f"New Wudgres lead processed.\n\n"
                     f"Customer: {c_name}\n"
@@ -150,18 +148,13 @@ def run_automation():
                     f"Assigned Display Center:\n"
                     f"{d_name}\n"
                     f"📞 {d_phone}\n\n"
-                    f"Status: Customer and dealer notified successfully.\n\n"
                     f"– Automated Lead System"
                 )
                 owner_status = send_whatsapp(OWNER_PHONE, owner_msg, "Owner")
 
-                if (
-                    (customer_status in [True, "INVALID"])
-                    and dealer_status
-                    and owner_status
-                ):
+                if (customer_status in [True, "INVALID"]) and dealer_status and owner_status:
                     sheet.update_cell(idx, processed_col, "TRUE")
-                    print(f"✔️ Row {idx} Processed successfully.")
+                    print(f"✔️ Row {idx} processed.")
                 else:
                     print(f"⏸️ Row {idx} failed internal alerts.")
 
