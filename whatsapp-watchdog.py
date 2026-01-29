@@ -4,6 +4,7 @@ import requests
 import time
 import os
 import json
+import re
 
 # ---------- CONFIG ----------
 SHEET_NAME = "Coolify-Wudgres"
@@ -28,7 +29,6 @@ def setup_google_sheets():
         "https://www.googleapis.com/auth/drive",
     ]
 
-    # 🔐 Load credentials from environment variable (Coolify)
     creds_json = os.environ.get("GOOGLE_CREDENTIALS_JSON")
     if not creds_json:
         raise Exception("GOOGLE_CREDENTIALS_JSON env variable not found")
@@ -43,16 +43,27 @@ def setup_google_sheets():
 def format_phone(phone):
     if not phone:
         return None
-    clean = str(phone).replace("+", "").replace(" ", "").replace("-", "").strip()
-    if not clean.startswith("91"):
-        clean = "91" + clean
-    return clean
+
+    # Keep ONLY digits (remove letters, symbols, p:+, spaces, etc)
+    digits = re.sub(r"\D", "", str(phone))
+
+    if not digits:
+        return None
+
+    # Ensure Indian country code
+    if digits.startswith("91"):
+        return digits
+
+    if len(digits) == 10:
+        return "91" + digits
+
+    return digits
 
 
 def send_whatsapp(phone, message, label="Contact"):
     clean_phone = format_phone(phone)
     if not clean_phone:
-        print(f"⚠️ [{label}] Missing phone number")
+        print(f"⚠️ [{label}] Invalid or missing phone number")
         return False
 
     url = f"{API_URL}/message/sendText/{INSTANCE}"
@@ -92,7 +103,7 @@ def run_automation():
         return
 
     last_wait_log_time = time.time()
-    print("🚀 Wudgres System Live. Links will be active if they start with https://")
+    print("🚀 Wudgres System Live. Waiting for new leads...")
 
     while True:
         processed_any = False
@@ -135,8 +146,9 @@ def run_automation():
                     f"Phone: {c_phone}\n"
                     f"Pincode: {c_pin}\n\n"
                     f"Please connect with them at the earliest.\n\n"
-                    f"– Wudgres"
+                    f"- Wudgres"
                 )
+
                 dealer_status = send_whatsapp(d_phone, dealer_msg, "Dealer")
                 time.sleep(2)
 
@@ -148,8 +160,9 @@ def run_automation():
                     f"Assigned Display Center:\n"
                     f"{d_name}\n"
                     f"📞 {d_phone}\n\n"
-                    f"– Automated Lead System"
+                    f"- Automated Lead System"
                 )
+
                 owner_status = send_whatsapp(OWNER_PHONE, owner_msg, "Owner")
 
                 if (customer_status in [True, "INVALID"]) and dealer_status and owner_status:
