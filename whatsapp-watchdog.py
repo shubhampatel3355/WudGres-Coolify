@@ -22,7 +22,6 @@ MAX_RETRIES = 3
 RETRY_DELAY = 5
 # ----------------------------
 
-
 def setup_google_sheets():
     scope = [
         "https://spreadsheets.google.com/feeds",
@@ -39,26 +38,17 @@ def setup_google_sheets():
     client = gspread.authorize(creds)
     return client.open(SHEET_NAME).sheet1
 
-
 def format_phone(phone):
     if not phone:
         return None
-
-    # Keep ONLY digits (remove letters, symbols, p:+, spaces, etc)
     digits = re.sub(r"\D", "", str(phone))
-
     if not digits:
         return None
-
-    # Ensure Indian country code
     if digits.startswith("91"):
         return digits
-
     if len(digits) == 10:
         return "91" + digits
-
     return digits
-
 
 def send_whatsapp(phone, message, label="Contact"):
     clean_phone = format_phone(phone)
@@ -74,23 +64,17 @@ def send_whatsapp(phone, message, label="Contact"):
         try:
             response = requests.post(url, json=payload, headers=headers, timeout=15)
             res_data = response.json()
-
             if response.status_code == 201:
                 print(f"✅ [{label}] Sent to {clean_phone}")
                 return True
-
             if response.status_code == 400 and "exists" in str(res_data):
                 print(f"❌ [{label}] {clean_phone} not on WhatsApp. Skipping.")
                 return "INVALID"
-
         except Exception as e:
             print(f"⚠️ [{label}] Error: {e}")
-
         if attempt < MAX_RETRIES:
             time.sleep(RETRY_DELAY)
-
     return False
-
 
 def run_automation():
     sheet = setup_google_sheets()
@@ -116,6 +100,7 @@ def run_automation():
 
                 processed_any = True
 
+                # Basic Info
                 c_name = row.get("CustomerName", "Customer")
                 c_phone = row.get("CustomerPhone")
                 c_pin = row.get("CustomerPincode", "N/A")
@@ -123,6 +108,14 @@ def run_automation():
                 d_phone = row.get("DealerPhone")
                 d_addr = row.get("DealerAddress", "").strip()
 
+                # [cite_start]NEW COLUMNS [cite: 1]
+                req_type = row.get("you_are_looking_for_doors_for?", "N/A")
+                door_interest = row.get("which_door_are_you_interested_in?", "N/A")
+                door_qty = row.get("how_many_doors_do_you_require?", "N/A")
+                timeline = row.get("when_do_you_plan_to_finalize_the_purchase?", "N/A")
+                contact_pref = row.get("preferred_contact_method", "N/A")
+
+                # Customer Message (Unchanged)
                 customer_msg = (
                     f"Hi {c_name},\n"
                     f"Thanks for your interest in Wudgres.\n\n"
@@ -139,12 +132,19 @@ def run_automation():
                 customer_status = send_whatsapp(c_phone, customer_msg, "Customer")
                 time.sleep(2)
 
+                # Dealer Message (Updated with new columns)
                 dealer_msg = (
                     f"New Wudgres enquiry assigned to you.\n\n"
                     f"Customer details:\n"
                     f"Name: {c_name}\n"
                     f"Phone: {c_phone}\n"
                     f"Pincode: {c_pin}\n\n"
+                    f"Requirement Details:\n"
+                    f"- Purpose: {req_type}\n"
+                    f"- Interested in: {door_interest}\n"
+                    f"- Quantity: {door_qty}\n"
+                    f"- Timeline: {timeline}\n"
+                    f"- Preferred Contact: {contact_pref}\n\n"
                     f"Please connect with them at the earliest.\n\n"
                     f"- Wudgres"
                 )
@@ -152,11 +152,17 @@ def run_automation():
                 dealer_status = send_whatsapp(d_phone, dealer_msg, "Dealer")
                 time.sleep(2)
 
+                # Owner Message (Updated with new columns)
                 owner_msg = (
                     f"New Wudgres lead processed.\n\n"
                     f"Customer: {c_name}\n"
                     f"📞 {c_phone}\n"
                     f"📍 Pincode: {c_pin}\n\n"
+                    f"Lead Details:\n"
+                    f"- Purpose: {req_type}\n"
+                    f"- Interest: {door_interest}\n"
+                    f"- Qty: {door_qty}\n"
+                    f"- Timeline: {timeline}\n\n"
                     f"Assigned Display Center:\n"
                     f"{d_name}\n"
                     f"📞 {d_phone}\n\n"
@@ -183,7 +189,6 @@ def run_automation():
             last_wait_log_time = time.time()
 
         time.sleep(POLL_INTERVAL)
-
 
 if __name__ == "__main__":
     run_automation()
